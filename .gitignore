@@ -1,0 +1,30 @@
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Environment variables / secrets
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Scraper logs
+scraper_logs/
+*.log
+
+# Hugging Face / Transformers cache
+.cache/
+huggingface/
+transformers_cache/
+
+# Temporary files
+*.tmp
+*.temp
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
