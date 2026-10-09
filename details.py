@@ -162,20 +162,25 @@ def get_specifications(property_data):
 
     return specifications
 
+def get_specification_value(specifications, name):
+    value = specifications.get(name)
 
-def get_specification_value(specifications, field):
+    if isinstance(value, list):
+        return value[0] if value else None
 
-    values = specifications.get(
-        field,
-        []
-    )
+    return value
 
-    if values:
+#for bedroom and fullbath
+def get_specification_int(specifications, name):
+    value = get_specification_value(specifications, name)
 
-        return values[0]
+    if value is None or value == "":
+        return None
 
-    return None
-
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return None
 
 def get_flagged_items(specifications, fields):
 
@@ -570,6 +575,16 @@ def create_property_details_list(
 
     return property_details
 
+def get_type(property_data):
+    categories = property_data.get("categories", [])
+
+    for category in categories:
+        parts = category.strip("/").split("/")
+
+        if parts:
+            return parts[0]
+
+    return None
 
 def create_property_details(property_data, cop_usd_rate):
 
@@ -737,8 +752,8 @@ def create_property_details(property_data, cop_usd_rate):
         "latLng_status":
             lat_lng_status,
 
-        "type":
-            "sales",
+        "type": 
+            get_type(property_data),
 
         "phone":
             phone,
@@ -765,11 +780,17 @@ def create_property_details(property_data, cop_usd_rate):
             None,
 
         "bedrooms":
-            specifications.get("Habitaciones"),
+            get_specification_int(
+                specifications,
+                "Habitaciones"
+            ),
 
         "full_baths":
-            specifications.get("Baños"),
-
+            get_specification_int(
+                specifications,
+                "Baños"
+            ),
+            
         "property_type":
             property_type,
 
