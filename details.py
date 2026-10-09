@@ -131,7 +131,8 @@ def get_properties(from_value, to_value):
 
     response = requests.get(
         API_URL,
-        params=params
+        params=params,
+        timeout=30
     )
 
     response.raise_for_status()
@@ -239,6 +240,72 @@ def get_images(property_data):
     return list(dict.fromkeys(images))
 
 
+def get_cop_usd_rate():
+
+    response = requests.get(
+        "https://api.frankfurter.dev/v2/rates?base=usd",
+        timeout=10
+    )
+
+    response.raise_for_status()
+
+    data = response.json()
+
+    # Find the USD -> COP exchange rate
+    rate_data = next(
+        item
+        for item in data
+        if item["quote"] == "COP"
+    )
+
+    usd_cop_rate = rate_data["rate"]
+
+    # Get the date of the exchange rate
+    rate_date = rate_data["date"]
+
+    print(
+        f"USD to COP exchange rate: {usd_cop_rate} "
+        f"(rate date: {rate_date})"
+    )
+
+    # Convert USD -> COP rate into COP -> USD rate
+    cop_usd_rate = 1 / usd_cop_rate
+
+    return cop_usd_rate
+
+
+def convert_price_to_usd(price, cop_usd_rate):
+
+    # Convert multiple prices from COP to USD
+    if isinstance(price, list):
+
+        usd_prices = []
+
+        for item in price:
+
+            if item is not None:
+
+                usd_prices.append(
+                    round(float(item) * cop_usd_rate, 3)
+                )
+
+            else:
+
+                usd_prices.append(None)
+
+        return usd_prices
+
+    # Convert a single price from COP to USD
+    if price is not None:
+
+        return round(
+            float(price) * cop_usd_rate,
+            3
+        )
+
+    return None
+
+
 def get_prices(property_data):
 
     prices = []
@@ -264,34 +331,55 @@ def get_prices(property_data):
 def get_area(description):
 
     if not description:
-
         return None
 
-    # First look for private area
+    patterns = [
+        # Prefer built area
+        r'área\s+construida\s*:?\s*(\d+(?:[.,]\d+)?)\s*m\s*(?:²|2)(?!\w)',
 
-    match = re.search(
-        r"Área\s+privada:\s*(\d+(?:[.,]\d+)?)\s*m²",
-        description,
-        re.IGNORECASE
-    )
+        # Fallback to private area
+        r'área\s+privada\s*:?\s*(\d+(?:[.,]\d+)?)\s*m\s*(?:²|2)(?!\w)',
 
-    if match:
+        # Fallback to general area
+        r'\bárea\s*:?\s*(\d+(?:[.,]\d+)?)\s*m\s*(?:²|2)(?!\w)',
 
-        return match.group(1)
+        # Match area mentioned in complementName, e.g. "con area 170m2"
+        r'\b(?:con\s+)?[áa]rea\s+(?:de\s+)?(\d+(?:[.,]\d+)?)\s*m\s*(?:²|2)(?!\w)',
 
-    # Then look for general area
+        # Match area without a specific label
+        r'(\d+(?:[.,]\d+)?)\s*m\s*(?:²|2)(?!\w)',
 
-    match = re.search(
-        r"Área(?:\s+construida)?\s*:\s*(\d+(?:[.,]\d+)?)\s*m²",
-        description,
-        re.IGNORECASE
-    )
+        # Match Spanish wording
+        r'(\d+(?:[.,]\d+)?)\s*metros?\s*cuadrados?\b',
+    ]
 
-    if match:
+    for pattern in patterns:
 
-        return match.group(1)
+        match = re.search(
+            pattern,
+            description,
+            re.IGNORECASE
+        )
+
+        if match:
+
+            return float(
+                match.group(1).replace(",", ".")
+            )
 
     return None
+
+
+# Convert square meters into square feet
+def convert_m2_to_sqft(area_m2):
+
+    if area_m2 is None:
+        return None
+
+    return round(
+        area_m2 * 10.7639,
+        2
+    )
 
 
 def get_property_type(property_data):
@@ -327,13 +415,77 @@ def get_property_type(property_data):
 
     return property_type
 
+def get_admin_price(description, specifications):
+
+    # Check the administration price in API specifications
+    for field in [
+        "Valor administración",
+        "Administración",
+        "Valor de administración",
+        "Cuota de administración",
+        "Administración mensual"
+    ]:
+
+        values = specifications.get(field, [])
+
+        if values and values[0]:
+
+            match = re.search(
+                r'\d[\d.,]*',
+                str(values[0])
+            )
+
+            if match:
+
+                return float(
+                    match.group(0).replace(".", "").replace(",", ".")
+                )
+
+    # Extract administration price from the description
+    if description:
+
+        patterns = [
+            # Match "administración: $456.000"
+            r'administraci[oó]n\s*:\s*\$?\s*([\d.]+(?:,\d+)?)',
+
+            # Match "administración de $738.305"
+            r'administraci[oó]n\s+de\s+\$?\s*([\d.]+(?:,\d+)?)',
+
+            # Match "de administración mensual de $490,000"
+            r'administraci[oó]n\s+mensual\s+de\s+\$?\s*([\d.]+(?:,\d+)?)',
+
+            # Match "de administración son de $380,000"
+            r'administraci[oó]n\s+son\s+de\s+\$?\s*([\d.]+(?:,\d+)?)',
+
+            # Match other formats containing "administración" before the price
+            r'administraci[oó]n[^.$\n]{0,60}\$?\s*([\d][\d.,]*)',
+        ]
+
+        for pattern in patterns:
+
+            match = re.search(
+                pattern,
+                description,
+                re.IGNORECASE
+            )
+
+            if match:
+
+                # Convert Colombian currency formatting into a number
+                price_text = match.group(1).replace(".", "").replace(",", "")
+
+                return int(price_text)
+
+    return None
+
 
 def create_property_details_list(
     property_data,
     specifications,
     property_type,
     price,
-    area
+    area,
+    cop_usd_rate
 ):
 
     property_details = [
@@ -411,14 +563,15 @@ def create_property_details_list(
 
         {
             "label": "COP per USD",
-            "value": None
+            "value": round(1 / cop_usd_rate, 2)
+            if cop_usd_rate else None
         }
     ]
 
     return property_details
 
 
-def create_property_details(property_data):
+def create_property_details(property_data, cop_usd_rate):
 
     specifications = get_specifications(
         property_data
@@ -432,8 +585,14 @@ def create_property_details(property_data):
         property_data
     )
 
-    area = get_area(
+    # Extract the original area in square meters
+    area_m2 = get_area(
         property_data.get("description")
+    )
+
+    # Convert the area from square meters into square feet
+    area = convert_m2_to_sqft(
+        area_m2
     )
 
     property_type = get_property_type(
@@ -509,10 +668,10 @@ def create_property_details(property_data):
             [None]
         )[0]
 
-    admin_price = specifications.get(
-        "Valor administración",
-        [None]
-    )[0]
+    admin_price = get_admin_price(
+    property_data.get("description"),
+    specifications
+    )
 
     if admin_price:
 
@@ -532,6 +691,15 @@ def create_property_details(property_data):
 
         price = prices
 
+
+    # Convert the original COP price into USD
+    usd_price = convert_price_to_usd(
+        price,
+        cop_usd_rate
+    )
+
+    
+
     # Create property_details in the required format
 
     property_details_list = create_property_details_list(
@@ -539,7 +707,8 @@ def create_property_details(property_data):
         specifications,
         property_type,
         price,
-        area
+        area,
+        cop_usd_rate
     )
 
     property_details = {
@@ -575,10 +744,10 @@ def create_property_details(property_data):
             phone,
 
         "price":
-            price,
+            usd_price,
 
         "price_unit":
-            None,
+            "USD",
 
         "details":
             property_data.get("description"),
@@ -604,6 +773,7 @@ def create_property_details(property_data):
         "property_type":
             property_type,
 
+        # Area is now stored in square feet
         "interior_sq_ft":
             area,
 
@@ -769,6 +939,9 @@ def save_to_csv(property_details):
 
 def main():
 
+    # Get current COP to USD exchange rate
+    cop_usd_rate = get_cop_usd_rate()
+
     print("Getting properties...")
 
     products, total_records = get_properties(
@@ -784,7 +957,8 @@ def main():
     for product in products:
 
         property_details = create_property_details(
-            product
+            product,
+            cop_usd_rate
         )
 
         save_to_csv(
