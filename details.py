@@ -6,6 +6,7 @@ import json
 import html
 import logging
 import base64
+import time
 
 import requests
 from dotenv import load_dotenv
@@ -51,6 +52,73 @@ TRANSLATE_URL = "https://translate-pa.googleapis.com/v1/translateHtml"
 _translation_cache = {}
 
 
+# def translate_text(text, source="es", target="en"):
+#     if not text or not isinstance(text, str):
+#         return text
+
+#     text = text.strip()
+
+#     if not text:
+#         return text
+
+#     # Avoid translating the same text multiple times
+#     cache_key = (text, source, target)
+
+#     if cache_key in _translation_cache:
+#         return _translation_cache[cache_key]
+
+#     if not GOOGLE_TRANSLATE_API_KEY:
+#         raise ValueError(
+#             "GOOGLE_TRANSLATE_API_KEY is missing from .env"
+#         )
+
+#     headers = {
+#         "Content-Type": "application/json+protobuf",
+#         "x-goog-api-key": GOOGLE_TRANSLATE_API_KEY,
+#     }
+
+#     # Request format observed in Chrome DevTools
+#     payload = [
+#         [[text], source, target],
+#         "te_lib"
+#     ]
+
+#     try:
+#         response = requests.post(
+#             TRANSLATE_URL,
+#             headers=headers,
+#             json=payload,
+#             timeout=20,
+#         )
+
+#         response.raise_for_status()
+#         result = response.json()
+
+#         # Extract the translated text
+#         if not result or not result[0]:
+#             raise ValueError("Google returned an empty translation")
+
+#         translated = result[0][0]
+
+#         # Some responses may contain multiple text segments
+#         if isinstance(translated, list):
+#             translated = "".join(str(part) for part in translated)
+
+#         if not isinstance(translated, str):
+#             raise ValueError(
+#                 f"Unexpected translation format: {translated!r}"
+#             )
+
+#         _translation_cache[cache_key] = translated
+
+#         return translated
+
+#     except requests.RequestException as error:
+#         raise RuntimeError(
+#             f"Google Translate request failed: {error}"
+#         ) from error
+
+
 def translate_text(text, source="es", target="en"):
     if not text or not isinstance(text, str):
         return text
@@ -82,40 +150,64 @@ def translate_text(text, source="es", target="en"):
         "te_lib"
     ]
 
-    try:
-        response = requests.post(
-            TRANSLATE_URL,
-            headers=headers,
-            json=payload,
-            timeout=20,
-        )
-
-        response.raise_for_status()
-        result = response.json()
-
-        # Extract the translated text
-        if not result or not result[0]:
-            raise ValueError("Google returned an empty translation")
-
-        translated = result[0][0]
-
-        # Some responses may contain multiple text segments
-        if isinstance(translated, list):
-            translated = "".join(str(part) for part in translated)
-
-        if not isinstance(translated, str):
-            raise ValueError(
-                f"Unexpected translation format: {translated!r}"
+    # Retry temporary request failures up to 3 times
+    for attempt in range(3):
+        try:
+            response = requests.post(
+                TRANSLATE_URL,
+                headers=headers,
+                json=payload,
+                timeout=20,
             )
 
-        _translation_cache[cache_key] = translated
+            response.raise_for_status()
+            result = response.json()
+            break
 
-        return translated
+        except requests.RequestException as error:
+            if attempt < 2:
+                wait_seconds = 2 * (attempt + 1)
 
-    except requests.RequestException as error:
-        raise RuntimeError(
-            f"Google Translate request failed: {error}"
-        ) from error
+                logger.warning(
+                    "Translation attempt %s failed. "
+                    "Retrying in %s seconds: %s",
+                    attempt + 1,
+                    wait_seconds,
+                    error,
+                )
+
+                time.sleep(wait_seconds)
+
+            else:
+                logger.error(
+                    "Translation failed after 3 attempts. "
+                    "Using original text: %s",
+                    error,
+                )
+                return text
+
+    # Extract the translated text
+    if not result or not result[0]:
+        logger.warning(
+            "Google returned an empty translation. Using original text."
+        )
+        return text
+
+    translated = result[0][0]
+
+    # Some responses may contain multiple text segments
+    if isinstance(translated, list):
+        translated = "".join(str(part) for part in translated)
+
+    if not isinstance(translated, str):
+        logger.warning(
+            "Unexpected translation format. Using original text."
+        )
+        return text
+
+    _translation_cache[cache_key] = translated
+
+    return translated
 
 # AMENITY FIELDS
 
