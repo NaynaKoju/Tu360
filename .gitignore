@@ -28,3 +28,5 @@ transformers_cache/
 
 # PyCharm
 .idea/
+
+detailstr.py
