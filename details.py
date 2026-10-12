@@ -592,7 +592,7 @@ def create_property_details_list(
     return [
         {
             "label": "Property Type",
-            "value": property_type,
+            "value": translate_text(property_type),
         },
         {
             "label": "Condition",
@@ -779,7 +779,7 @@ def create_property_details(property_data, cop_usd_rate):
             "Baños"
         ),
 
-        "property_type": property_type,
+        "property_type": translate_text(property_type),
 
         "interior_sq_ft": area,
 
