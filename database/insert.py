@@ -1,4 +1,3 @@
-
 import os
 import json
 import uuid
@@ -7,10 +6,7 @@ import pandas as pd
 
 from connect import get_connection
 
-
-# --------------------------------------------------
 # CONFIGURATION
-# --------------------------------------------------
 
 CSV_FILE = "../csv_files/property_details.csv"
 
@@ -29,10 +25,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-
-# --------------------------------------------------
 # HELPER FUNCTIONS
-# --------------------------------------------------
 
 def clean_value(value):
     """
@@ -59,7 +52,6 @@ def clean_value(value):
 
     return value
 
-
 def generate_uuid(row):
     """
     Generate a stable UUID using the property link.
@@ -77,7 +69,6 @@ def generate_uuid(row):
     return str(
         uuid.uuid5(uuid.NAMESPACE_URL, str(identifier))
     )
-
 
 def serialize_json(value):
     """
@@ -112,7 +103,6 @@ def serialize_json(value):
 
     return json.dumps(value, ensure_ascii=False)
 
-
 def to_integer(value):
     """
     Convert numeric values into integers for MySQL columns.
@@ -130,9 +120,7 @@ def to_integer(value):
         return None
 
 
-# --------------------------------------------------
 # DATABASE INSERT
-# --------------------------------------------------
 
 def insert_properties():
 
@@ -388,10 +376,7 @@ def insert_properties():
         if connection:
             connection.close()
 
-
-# --------------------------------------------------
 # MAIN
-# --------------------------------------------------
 
 if __name__ == "__main__":
     insert_properties()
