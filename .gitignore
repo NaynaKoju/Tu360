@@ -30,3 +30,5 @@ transformers_cache/
 .idea/
 
 detailstr.py
+test.py
+testdetails.csv 
