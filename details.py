@@ -3,7 +3,6 @@ import os
 import re
 import csv
 import json
-import html
 import logging
 import base64
 import time
@@ -504,7 +503,7 @@ def convert_price_to_usd(price, cop_usd_rate):
 
 def get_area(description=None, specifications=None):
 
-    # 1. Try extracting area from API specifications first
+    # 1. Try extracting the exact area from API specifications first.
     if specifications:
         preferred_fields = [
             "Área Construida",
@@ -518,11 +517,11 @@ def get_area(description=None, specifications=None):
                 if field_name.strip().lower() != preferred_field.lower():
                     continue
 
-                # Get the first value if values is a list
+                # Get the first value if values is a list.
                 if isinstance(values, list):
                     values = values[0] if values else None
 
-                # Handle API values that are dictionaries
+                # Handle API values that are dictionaries.
                 if isinstance(values, dict):
                     values = values.get("name")
 
@@ -540,7 +539,7 @@ def get_area(description=None, specifications=None):
                 except (ValueError, TypeError):
                     continue
 
-    # 2. Fall back to extracting area from the description
+    # 2. Try extracting the exact area from the description.
     if description:
         patterns = [
             r'área\s+construida\s*:?\s*(\d+(?:[.,]\d+)?)\s*m\s*(?:²|2)(?!\w)',
@@ -556,7 +555,9 @@ def get_area(description=None, specifications=None):
 
             if match:
                 try:
-                    area_m2 = float(match.group(1).replace(",", "."))
+                    area_m2 = float(
+                        match.group(1).replace(",", ".")
+                    )
 
                     if area_m2 > 0:
                         return area_m2
@@ -564,6 +565,39 @@ def get_area(description=None, specifications=None):
                 except (ValueError, TypeError):
                     continue
 
+    # 3. If exact area is unavailable, use the higher value
+    #    from the API's constructed-area range.
+    if specifications:
+        for field_name, values in specifications.items():
+
+            if field_name.strip().lower() != "rango área construida":
+                continue
+
+            # Get the first value if values is a list.
+            if isinstance(values, list):
+                values = values[0] if values else None
+
+            if values is None:
+                continue
+
+            # Extract both numbers from a range such as "101m2 - 200m2".
+            numbers = re.findall(
+                r'\d+(?:[.,]\d+)?',
+                str(values)
+            )
+
+            if len(numbers) >= 2:
+                try:
+                    lower_area = float(numbers[0].replace(",", "."))
+                    higher_area = float(numbers[1].replace(",", "."))
+
+                    if lower_area > 0 and higher_area >= lower_area:
+                        return higher_area
+
+                except (ValueError, TypeError):
+                    continue
+
+    # 4. Return None if no area is available.
     return None
 
 def convert_m2_to_sqft(area_m2):
@@ -892,7 +926,7 @@ def create_property_details(property_data, cop_usd_rate):
         "exterior_details": exterior_details,
         "interior_details": interior_details,
 
-        "city_checked": 1 if city else 0,
+        "city_checked": None,
 
         "province": province,
         "property_status": translate_text(
@@ -1131,3 +1165,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
