@@ -1,4 +1,3 @@
-
 import os
 import re
 import csv
@@ -284,6 +283,7 @@ def get_specification_value(specifications, name):
     return value
 
 
+
 def get_specification_int(specifications, name):
 
     value = get_specification_value(
@@ -294,12 +294,17 @@ def get_specification_int(specifications, name):
     if value is None or value == "":
         return None
 
+    # Handle values such as "5+".
+    value = str(value).strip()
+
+    if value.endswith("+"):
+        value = value[:-1].strip()
+
     try:
-        return int(float(str(value).strip()))
+        return int(float(value))
 
     except (ValueError, TypeError):
         return None
-
 
 def get_flagged_items(specifications, fields):
 
@@ -347,19 +352,47 @@ def get_exterior_details(specifications):
 
 # IMAGES AND PRICES
 
+
 def get_images(property_data):
 
     images = []
 
+    # 1. Get images from regular property items.
     for item in property_data.get("items", []):
 
         for image in item.get("images", []):
 
             image_url = image.get("imageUrl")
 
-            if image_url:
-                images.append(image_url)
+            if image_url and image_url.strip() not in images:
+                images.append(image_url.strip())
 
+    # 2. Get images from project specifications.
+    for group in property_data.get("specificationGroups", []):
+
+        for specification in group.get("specifications", []):
+
+            if specification.get("name") == "Imagenes Proyecto":
+
+                values = specification.get("values", [])
+
+                for value in values:
+
+                    if not value:
+                        continue
+
+                    # The project image URLs are comma-separated
+                    # inside a single string.
+                    image_urls = value.split(",")
+
+                    for image_url in image_urls:
+
+                        image_url = image_url.strip()
+
+                        if image_url.startswith("https://") and image_url not in images:
+                            images.append(image_url)
+
+    # Remove duplicate image URLs.
     return list(dict.fromkeys(images))
 
 
