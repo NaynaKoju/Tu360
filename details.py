@@ -50,74 +50,6 @@ TRANSLATE_URL = "https://translate-pa.googleapis.com/v1/translateHtml"
 
 _translation_cache = {}
 
-
-# def translate_text(text, source="es", target="en"):
-#     if not text or not isinstance(text, str):
-#         return text
-
-#     text = text.strip()
-
-#     if not text:
-#         return text
-
-#     # Avoid translating the same text multiple times
-#     cache_key = (text, source, target)
-
-#     if cache_key in _translation_cache:
-#         return _translation_cache[cache_key]
-
-#     if not GOOGLE_TRANSLATE_API_KEY:
-#         raise ValueError(
-#             "GOOGLE_TRANSLATE_API_KEY is missing from .env"
-#         )
-
-#     headers = {
-#         "Content-Type": "application/json+protobuf",
-#         "x-goog-api-key": GOOGLE_TRANSLATE_API_KEY,
-#     }
-
-#     # Request format observed in Chrome DevTools
-#     payload = [
-#         [[text], source, target],
-#         "te_lib"
-#     ]
-
-#     try:
-#         response = requests.post(
-#             TRANSLATE_URL,
-#             headers=headers,
-#             json=payload,
-#             timeout=20,
-#         )
-
-#         response.raise_for_status()
-#         result = response.json()
-
-#         # Extract the translated text
-#         if not result or not result[0]:
-#             raise ValueError("Google returned an empty translation")
-
-#         translated = result[0][0]
-
-#         # Some responses may contain multiple text segments
-#         if isinstance(translated, list):
-#             translated = "".join(str(part) for part in translated)
-
-#         if not isinstance(translated, str):
-#             raise ValueError(
-#                 f"Unexpected translation format: {translated!r}"
-#             )
-
-#         _translation_cache[cache_key] = translated
-
-#         return translated
-
-#     except requests.RequestException as error:
-#         raise RuntimeError(
-#             f"Google Translate request failed: {error}"
-#         ) from error
-
-
 def translate_text(text, source="es", target="en"):
     if not text or not isinstance(text, str):
         return text
@@ -267,12 +199,12 @@ def get_properties(from_value, to_value):
             {"key": "ciudad", "value": "medellin"},
         ],
 
-        "operator": "and",
-        "fuzzy": "0",
-        "searchState": None,
-        "facetsBehavior": "Static",
-        "categoryTreeBehavior": "default",
-        "withFacets": False,
+        # "operator": "and",
+        # "fuzzy": "0",
+        # "searchState": None,
+        # "facetsBehavior": "Static",
+        # "categoryTreeBehavior": "default",
+        # "withFacets": False,
     }
 
     variables_base64 = base64.b64encode(
@@ -387,7 +319,6 @@ def get_flagged_items(specifications, fields):
             items.append(translate_text(field))
 
     return items
-
 
 def get_interior_details(specifications):
 
@@ -571,27 +502,29 @@ def get_area(description=None, specifications=None):
         for field_name, values in specifications.items():
 
             if field_name.strip().lower() != "rango área construida":
+                # print(field_name)
                 continue
-
+            
             # Get the first value if values is a list.
             if isinstance(values, list):
                 values = values[0] if values else None
+                # print(values)
 
             if values is None:
                 continue
 
             # Extract both numbers from a range such as "101m2 - 200m2".
-            numbers = re.findall(
-                r'\d+(?:[.,]\d+)?',
-                str(values)
-            )
+            values = re.sub(r'm\s*[²2]', '', str(values), flags=re.IGNORECASE)
+
+            numbers = re.findall(r'\d+(?:[.,]\d+)?', values)
+            # print(numbers)
 
             if len(numbers) >= 2:
                 try:
                     lower_area = float(numbers[0].replace(",", "."))
                     higher_area = float(numbers[1].replace(",", "."))
 
-                    if lower_area > 0 and higher_area >= lower_area:
+                    if lower_area >= 0 and higher_area >= lower_area:
                         return higher_area
 
                 except (ValueError, TypeError):
@@ -637,7 +570,6 @@ def get_type(property_data):
     return None
 
 # ADMINISTRATION PRICE
-
 def parse_cop_amount(value):
 
     if value is None:
@@ -786,7 +718,6 @@ def create_property_details_list(
         },
     ]
 
-
 def create_property_details(property_data, cop_usd_rate):
 
     specifications = get_specifications(property_data)
@@ -800,7 +731,7 @@ def create_property_details(property_data, cop_usd_rate):
     area_m2 = get_area(description, specifications)
     area = convert_m2_to_sqft(area_m2)
 
-    property_type = get_property_type(property_data)
+    property_type = translate_text(get_property_type(property_data))
 
     interior_details = get_interior_details(specifications)
     exterior_details = get_exterior_details(specifications)
@@ -879,7 +810,7 @@ def create_property_details(property_data, cop_usd_rate):
         "lng": longitude,
         "latLng_status": lat_lng_status,
 
-        "type": get_type(property_data),
+        "type": translate_text(get_type(property_data)),
 
         "phone": phone,
 
