@@ -579,8 +579,9 @@ def get_property_type(property_data):
     link = property_data.get("link", "").lower()
 
     # Extract the property type from the beginning of the URL
-    match = re.search(r"/([^/]+)-en-venta-en-", link)
-
+    match = re.search(r"/([^/]+)-en-venta(?:-en)?-"
+    , link)
+    
     if match:
         property_type = match.group(1)
         return property_type.replace("-", " ").title()

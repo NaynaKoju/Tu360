@@ -321,50 +321,6 @@ def main():
         "API scraping completed successfully"
     )
 
-# def main():
-
-#     products, total_records = get_properties(0, 35)
-
-#     property_data = products[0]
-
-#     print("\nPRODUCT NAME:")
-#     print(property_data.get("productName"))
-
-#     print("\nLINK:")
-#     print(property_data.get("link"))
-
-#     print("\nDESCRIPTION:")
-#     print(property_data.get("description"))
-
-#     print("\nPRODUCT REFERENCE:")
-#     print(property_data.get("productReference"))
-
-#     print("\nPRICE RANGE:")
-#     print(property_data.get("priceRange"))
-
-#     print("\nSPECIFICATION GROUPS:")
-#     print(property_data.get("specificationGroups"))
-
-#     print("\nPROPERTIES:")
-#     print(property_data.get("properties"))
- #checking images and prices
-    # products, total_records = get_properties(0, 35)
-
-    # property_data = products[0]
-
-    # print("\nIMAGES:")
-    # for item in property_data.get("items", []):
-    #     for image in item.get("images", []):
-    #         print(image.get("imageUrl"))
-
-    # print("\nPRICES:")
-    # for item in property_data.get("items", []):
-    #     for seller in item.get("sellers", []):
-    #         offer = seller.get("commertialOffer", {})
-    #         print(offer.get("Price"))
-
-
-
 # Run main function
 if __name__ == "__main__":
     main()
