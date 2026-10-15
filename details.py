@@ -849,7 +849,7 @@ def create_property_details(property_data, cop_usd_rate):
         "phone": phone,
 
         "price": usd_price,
-        "price_unit": "USD",
+        "price_unit": None,
 
         "details": translate_text(description),
 
@@ -858,7 +858,12 @@ def create_property_details(property_data, cop_usd_rate):
         "about": None,
 
         "web_id": property_data.get("productReference"),
-        "mls_id": None,
+         "mls_id": (
+            f"inm{property_data.get('productId')}"
+            if property_data.get("productId") is not None
+            else None
+        ),
+
 
         "bedrooms": get_specification_int(
             specifications,
